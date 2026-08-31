@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1d20">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>한자 학습 · JLPT</title>
+<style>
+  :root{--bg:#1a1d20;--card:#25292e;--line:#3a4048;--accent:#74c0fc;--gold:#ffe066;
+        --ok:#40c057;--no:#fa5252;--muted:#868e96;--pink:#ffa8a8;--orange:#ffd8a8;
+        --safe-b:env(safe-area-inset-bottom);--safe-t:env(safe-area-inset-top);}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:#f1f3f5;font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+       display:flex;flex-direction:column;overflow:hidden;}
+  a{color:var(--accent);}
+  .topbar{padding:calc(10px + var(--safe-t)) 16px 10px;font-size:17px;font-weight:800;text-align:center;border-bottom:1px solid var(--line);flex:0 0 auto;}
+  #view{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;padding-bottom:24px;}
+  .tabbar{flex:0 0 auto;display:flex;border-top:1px solid var(--line);background:var(--card);padding-bottom:var(--safe-b);}
+  .tabbar button{flex:1;background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;padding:10px 0 8px;cursor:pointer;}
+  .tabbar button .ic{display:block;font-size:20px;margin-bottom:2px;}
+  .tabbar button.on{color:var(--accent);}
+  button{font-family:inherit;}
+  .btn{font-size:15px;padding:12px 20px;border-radius:12px;border:none;background:#1971c2;color:#fff;font-weight:700;cursor:pointer;}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:#f1f3f5;}
+  .btn:disabled{opacity:.5;}
+  .seg{display:flex;gap:8px;flex-wrap:wrap;}
+  .seg button{font-size:14px;padding:9px 14px;border-radius:10px;background:#2b3035;color:#f1f3f5;border:1px solid var(--line);cursor:pointer;}
+  .seg button.on{background:#1971c2;border-color:#1971c2;font-weight:700;}
+  label{display:block;margin:16px 0 8px;font-size:14px;color:#ced4da;font-weight:600;}
+  select{width:100%;font-size:15px;padding:11px 12px;border-radius:10px;background:#2b3035;color:#f1f3f5;border:1px solid var(--line);}
+  .muted{color:var(--muted);}
+  h1{font-size:20px;margin:0 0 6px;}
+
+  /* 학습 카드 */
+  .learn-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .kcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;min-height:60vh;display:flex;flex-direction:column;}
+  .kcard .lvl{align-self:flex-start;font-size:12px;font-weight:700;color:var(--accent);background:rgba(116,192,252,.15);padding:3px 10px;border-radius:20px;}
+  .kcard .han{font-size:120px;font-weight:800;text-align:center;line-height:1.1;margin:6px 0;}
+  .kcard .eumhun{text-align:center;font-size:24px;font-weight:800;color:var(--gold);margin-bottom:4px;}
+  .kcard .jp{text-align:center;font-size:17px;margin-bottom:14px;}
+  .kcard .jp .on{color:var(--pink);} .kcard .jp .kun{color:var(--orange);} .kcard .jp .lbl{color:var(--muted);font-size:13px;margin:0 4px 0 10px;}
+  .sec{border-top:1px dashed rgba(255,255,255,.14);padding-top:12px;margin-top:12px;}
+  .sec h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+  .ex-row{margin:4px 0;font-size:15px;}
+  .ex-row .w{font-size:18px;font-weight:800;margin-right:6px;}
+  .ex-row .r{color:var(--orange);margin-right:6px;} .ex-row .k{color:var(--gold);font-weight:700;margin-right:8px;} .ex-row .m{color:var(--accent);font-weight:700;}
+  .ety .tag{display:inline-block;background:rgba(116,192,252,.15);color:var(--accent);font-weight:700;padding:2px 10px;border-radius:6px;font-size:13px;}
+  .ety .row{font-size:14px;margin:6px 0;} .ety .row .lab{color:var(--muted);margin-right:8px;}
+  .ety .cc{font-size:18px;font-weight:800;margin-right:3px;} .ety .ce{color:var(--accent);font-weight:700;margin-right:10px;} .ety .ce-none{color:#7a8088;font-size:12px;margin-right:10px;}
+  .ety .story{margin-top:10px;font-size:14px;color:#dee2e6;line-height:1.7;}
+  .nav{display:flex;gap:10px;margin-top:14px;}
+  .nav .btn{flex:1;}
+  .save-btn{margin-top:14px;width:100%;}
+  .save-btn.saved{background:rgba(64,192,120,.2);border:1px solid var(--ok);color:#8ce99a;}
+
+  /* 단어장 */
+  .item{display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding:12px 0;}
+  .item .han{font-size:26px;font-weight:800;color:var(--accent);min-width:40px;}
+  .item .meta{flex:1;font-size:13px;line-height:1.5;}
+  .item .meta .eh{color:var(--gold);font-weight:700;}
+  .item .del{color:var(--muted);font-size:20px;padding:0 4px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .toolbar .btn{font-size:13px;padding:9px 12px;}
+  #search{width:100%;padding:11px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);color:#f1f3f5;font-size:15px;margin-bottom:12px;}
+  .empty{text-align:center;color:var(--muted);padding:50px 0;font-size:14px;}
+
+  /* 시험 */
+  .topinfo{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-bottom:12px;}
+  .bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-bottom:20px;}
+  .bar>div{height:100%;background:var(--accent);width:0;transition:width .25s;}
+  .qtype{font-size:13px;color:var(--accent);margin-bottom:6px;}
+  .qhan{font-size:80px;font-weight:800;text-align:center;margin:4px 0 20px;}
+  .options{display:grid;gap:10px;}
+  .opt{display:flex;align-items:center;gap:10px;text-align:left;font-size:16px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:#2b3035;color:#f1f3f5;font-family:inherit;}
+  .opt .opt-reading{display:none;flex-direction:column;min-width:96px;font-size:14px;line-height:1.35;}
+  .opt .opt-reading.shown{display:flex;} .opt .opt-reading .r-on{color:var(--pink);font-weight:600;} .opt .opt-reading .r-kun{color:var(--orange);font-weight:600;} .opt .opt-reading .r-none{color:#5c6068;}
+  .opt .opt-ans{flex:1;} .opt .opt-han{display:none;font-size:19px;font-weight:800;color:var(--accent);} .opt .opt-han.shown{display:inline-block;}
+  .opt.correct{background:rgba(64,192,120,.18);border-color:var(--ok);color:#8ce99a;font-weight:700;} .opt.correct .opt-han{color:#8ce99a;}
+  .opt.wrong{background:rgba(250,82,82,.16);border-color:var(--no);color:#ffc9c9;} .opt.wrong .opt-han{color:#ffc9c9;}
+  .verdict{margin-top:16px;border-radius:12px;padding:14px 16px;border:1px solid var(--line);display:none;}
+  .verdict.ok{display:block;background:rgba(64,192,120,.12);border-color:var(--ok);} .verdict.no{display:block;background:rgba(250,82,82,.12);border-color:var(--no);}
+  .verdict .vh{font-weight:800;margin-bottom:6px;} .verdict.ok .vh{color:#8ce99a;} .verdict.no .vh{color:#ffc9c9;}
+  .verdict .vb b{font-size:20px;color:var(--accent);margin-right:6px;}
+  .v-read{margin-top:8px;display:flex;gap:16px;font-size:16px;} .v-read .r-on{color:var(--pink);font-weight:700;} .v-read .r-kun{color:var(--orange);font-weight:700;} .v-read .r-none{color:#5c6068;}
+  .v-legend{margin-top:6px;font-size:12px;color:#7a8088;} .v-legend b{color:#adb5bd;}
+  .v-ex{margin-top:12px;border-top:1px dashed rgba(255,255,255,.14);padding-top:10px;} .v-ex .h{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .v-ety{margin-top:12px;border-top:1px dashed rgba(255,255,255,.14);padding-top:10px;} .v-ety .h{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .v-actions{margin-top:14px;display:flex;justify-content:flex-end;gap:8px;}
+  .score{font-size:52px;font-weight:800;color:var(--gold);text-align:center;margin:10px 0;}
+  .review .r{border-bottom:1px solid var(--line);padding:9px 0;font-size:15px;} .review .r .h{font-size:20px;font-weight:800;color:var(--accent);margin-right:10px;} .review .r .a{color:#8ce99a;}
+  .stat{background:#2b3035;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:14px;font-size:14px;} .stat b{color:var(--gold);}
+  .center{text-align:center;}
+</style>
+</head>
+<body>
+  <div class="topbar" id="title">한자 학습</div>
+  <div id="view"></div>
+  <nav class="tabbar">
+    <button data-tab="learn" class="on"><span class="ic">📖</span>학습</button>
+    <button data-tab="vocab"><span class="ic">📓</span>단어장</button>
+    <button data-tab="quiz"><span class="ic">📝</span>시험</button>
+  </nav>
+  <script src="app.js"></script>
+</body>
+</html>
