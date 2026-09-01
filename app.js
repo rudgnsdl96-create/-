@@ -61,8 +61,21 @@ function etyHtml(word){
   return uniq.map(c=>`<div style="margin-bottom:10px"><div style="font-size:22px;font-weight:800;margin-bottom:4px">${esc(c)}</div>${etyBlock(c)}</div>`).join('');
 }
 
-/* ---------- 학습 (카드 한 장씩) ---------- */
+/* ---------- 학습 (카드 한 장씩, 랜덤) ---------- */
 let learnLv = load('learnLv','L1'), learnIdx = 0, learnIdxW = 0;
+let memo = load('memo', {});  // { 한자/숙어: true } 암기완료 표시
+let learnDeck = [], learnDeckLv = null, learnDeckW = [], learnDeckWLv = null;
+// 암기완료는 뒤로 밀리는 가중 셔플
+function wshuffle(list, keyFn){
+  const arr=list.slice(), out=[];
+  while(arr.length){
+    const ws=arr.map(x=>memo[keyFn(x)]?0.12:1);
+    let tot=ws.reduce((a,b)=>a+b,0), r=Math.random()*tot, i=0;
+    while(r>ws[i]){ r-=ws[i]; i++; }
+    out.push(arr.splice(i,1)[0]);
+  }
+  return out;
+}
 function renderLearn(){
   titleEl.textContent='학습';
   view.innerHTML = `<div class="seg" id="mode" style="margin-bottom:12px">
@@ -75,10 +88,12 @@ function renderLearn(){
 
 function renderLearnKanji(){
   const body=$('learn-body');
-  const list=BANK[learnLv]||[];
+  if(learnDeckLv!==learnLv || !learnDeck.length){ learnDeck=wshuffle(BANK[learnLv]||[], x=>x.k); learnDeckLv=learnLv; learnIdx=0; }
+  const list=learnDeck;
+  if(!list.length){ body.innerHTML='<div class="empty">데이터가 없습니다.</div>'; return; }
   if(learnIdx>=list.length) learnIdx=0;
   const x=list[learnIdx];
-  const inv=vocab[x.k];
+  const inv=vocab[x.k], done=!!memo[x.k];
   body.innerHTML=`
     <div class="learn-top">
       <div class="seg" id="lv">${LV.map(L=>`<button data-v="${L}" class="${learnLv===L?'on':''}">${L}</button>`).join('')}</div>
@@ -86,31 +101,34 @@ function renderLearnKanji(){
     </div>
     <div class="muted" style="font-size:12px;margin:-4px 0 8px">${LV.map(L=>L+' '+(META[L]||'')).join(' · ')}</div>
     <div class="kcard">
-      <span class="lvl">${lvLabel(learnLv)}</span>
+      <span class="lvl">${lvLabel(learnLv)}${done?' · 암기완료':''}</span>
       <div class="han">${esc(x.k)}</div>
       <div class="eumhun">${esc(x.d)}</div>
       <div class="jp">${jpLine(x)}</div>
       ${exHtml(x.k)}
       <div class="sec"><h4>자원(字源)</h4>${etyHtml(x.k)}</div>
-      <button class="btn save-btn ${inv?'saved':''}" id="save" ${inv?'disabled':''}>${inv?'단어장에 있음':'+ 단어장에 담기'}</button>
+      <div class="learn-btns">
+        <button class="btn ghost memo-btn ${done?'done':''}" id="memo">${done?'✓ 암기완료됨':'암기완료'}</button>
+        <button class="btn ghost save-btn ${inv?'saved':''}" id="save" ${inv?'disabled':''}>${inv?'단어장에 있음':'+ 단어장'}</button>
+      </div>
       <div class="nav"><button class="btn ghost" id="prev">← 이전</button><button class="btn" id="next">다음 →</button></div>
     </div>`;
-  $('lv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ learnLv=b.dataset.v; save('learnLv',learnLv); learnIdx=0; renderLearn(); }));
+  $('lv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ learnLv=b.dataset.v; save('learnLv',learnLv); learnDeckLv=null; renderLearn(); }));
   $('prev').addEventListener('click',()=>{ learnIdx=(learnIdx-1+list.length)%list.length; renderLearn(); });
   $('next').addEventListener('click',()=>{ learnIdx=(learnIdx+1)%list.length; renderLearn(); });
   const sb=$('save'); if(!inv) sb.addEventListener('click',()=>{ addVocab(x); renderLearn(); });
-  swipe(list.length,()=>learnIdx,v=>{learnIdx=v;renderLearn();});
+  $('memo').addEventListener('click',()=>{ memo[x.k]=true; save('memo',memo); learnIdx=(learnIdx+1)%list.length; renderLearn(); });
 }
 
 function renderLearnWord(){
   const body=$('learn-body');
-  const list=WORD[learnLv]||[];
-  if(!list.length){ body.innerHTML=`<div class="seg" id="wlv" style="margin-bottom:12px">${LV.map(L=>`<button data-v="${L}" class="${learnLv===L?'on':''}">${L}</button>`).join('')}</div><div class="empty">이 급수의 숙어 데이터가 없습니다.</div>`;
-    $('wlv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{learnLv=b.dataset.v;save('learnLv',learnLv);learnIdxW=0;renderLearn();})); return; }
+  if(learnDeckWLv!==learnLv){ learnDeckW=wshuffle(WORD[learnLv]||[], x=>x.w); learnDeckWLv=learnLv; learnIdxW=0; }
+  const list=learnDeckW;
+  if(!list.length){ body.innerHTML=`<div class="seg" id="wlv" style="margin-bottom:12px">${LV.map(L=>`<button data-v="${L}" class="${learnLv===L?'on':''}">${L}</button>`).join('')}</div><div class="empty">이 레벨의 숙어 데이터가 없습니다.</div>`;
+    $('wlv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{learnLv=b.dataset.v;save('learnLv',learnLv);learnDeckWLv=null;renderLearn();})); return; }
   if(learnIdxW>=list.length) learnIdxW=0;
   const x=list[learnIdxW];
-  const inv=vocab[x.w];
-  // 글자별 음훈
+  const inv=vocab[x.w], done=!!memo[x.w];
   const per=Array.from(x.w).filter(c=>/[\u4e00-\u9fff]/.test(c)).map(c=>{ const bk=ONKUN[c.normalize('NFC')]; return `<span style="margin-right:12px"><b style="font-size:18px">${esc(c)}</b> <span style="color:var(--gold)">${bk?esc(bk.d):'?'}</span></span>`; }).join('');
   body.innerHTML=`
     <div class="learn-top">
@@ -119,28 +137,26 @@ function renderLearnWord(){
     </div>
     <div class="muted" style="font-size:12px;margin:-4px 0 8px">${LV.map(L=>L+' '+(META[L]||'')).join(' · ')}</div>
     <div class="kcard">
-      <span class="lvl">${lvLabel(learnLv)} 숙어</span>
+      <span class="lvl">${lvLabel(learnLv)} 숙어${done?' · 암기완료':''}</span>
       <div class="han" style="font-size:64px">${esc(x.w)}</div>
       <div class="jp" style="font-size:22px;color:var(--orange);text-align:center;margin-bottom:6px">${esc(x.r)}</div>
       <div class="eumhun">${esc(x.k)}</div>
       <div style="text-align:center;font-size:18px;color:var(--accent);font-weight:700;margin-bottom:14px">${esc(x.m)}</div>
       <div class="sec"><h4>글자별 음훈</h4><div>${per||'<span class="muted">-</span>'}</div></div>
       <div class="sec"><h4>자원(字源)</h4>${etyHtml(x.w)}</div>
-      <button class="btn save-btn ${inv?'saved':''}" id="wsave" ${inv?'disabled':''}>${inv?'단어장에 있음':'+ 단어장에 담기'}</button>
+      <div class="learn-btns">
+        <button class="btn ghost memo-btn ${done?'done':''}" id="wmemo">${done?'✓ 암기완료됨':'암기완료'}</button>
+        <button class="btn ghost save-btn ${inv?'saved':''}" id="wsave" ${inv?'disabled':''}>${inv?'단어장에 있음':'+ 단어장'}</button>
+      </div>
       <div class="nav"><button class="btn ghost" id="wprev">← 이전</button><button class="btn" id="wnext">다음 →</button></div>
     </div>`;
-  $('wlv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ learnLv=b.dataset.v; save('learnLv',learnLv); learnIdxW=0; renderLearn(); }));
+  $('wlv').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ learnLv=b.dataset.v; save('learnLv',learnLv); learnDeckWLv=null; renderLearn(); }));
   $('wprev').addEventListener('click',()=>{ learnIdxW=(learnIdxW-1+list.length)%list.length; renderLearn(); });
   $('wnext').addEventListener('click',()=>{ learnIdxW=(learnIdxW+1)%list.length; renderLearn(); });
   const sb=$('wsave'); if(!inv) sb.addEventListener('click',()=>{ vocab[x.w]={w:x.w,ko:x.k,hun:x.m,jp:x.r,lvl:learnLv+' 숙어',t:Date.now()}; save('vocab',vocab); renderLearn(); });
-  swipe(list.length,()=>learnIdxW,v=>{learnIdxW=v;renderLearn();});
+  $('wmemo').addEventListener('click',()=>{ memo[x.w]=true; save('memo',memo); learnIdxW=(learnIdxW+1)%list.length; renderLearn(); });
 }
 
-function swipe(len,get,setf){
-  let sx=0;
-  view.ontouchstart=e=>{ sx=e.touches[0].clientX; };
-  view.ontouchend=e=>{ const dx=e.changedTouches[0].clientX-sx; if(Math.abs(dx)>60){ setf((get()+(dx<0?1:-1)+len)%len); } };
-}
 function addVocab(x){
   vocab[x.k]={ w:x.k, ko:x.e, hun:x.d, jp:(x.on||[]).slice(0,3).join('·'), lvl:learnLvOf(x.k), t:Date.now() };
   save('vocab',vocab);
@@ -234,7 +250,7 @@ function poolItems(){
 function answerOf(it,t){ return t==='hun'?it.hun:it.ko; }
 function weightOf(key){ const s=stats[key]||{n:0,c:0}; if(s.n===0)return 4; const a=s.c/s.n; if(s.n>=3&&a>=0.8)return .25; if(a>=.5)return 1; return 2.5; }
 function wpick(items,n){ const out=[],arr=items.slice(); for(let k=0;k<n&&arr.length;k++){ const w=arr.map(weightOfItem); let tot=w.reduce((a,b)=>a+b,0),r=Math.random()*tot,i=0; while(r>w[i]){r-=w[i];i++;} out.push(arr.splice(i,1)[0]);} return out; }
-function weightOfItem(it){ return weightOf(it.key); }
+function weightOfItem(it){ let w=weightOf(it.key); if(memo[it.q]) w*=0.08; return w; }  // 암기완료는 출제 빈도 확 down
 
 function readingHtml(o){
   const on=(o.on||[]).slice(0,3).join(' / '), kun=(o.kun||[]).slice(0,3).join(' / ');
