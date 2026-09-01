@@ -1,7 +1,9 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const view = $('view'), titleEl = $('title');
-const LV = ['N5','N4','N3','N2','N1'];
+const LV = ['L1','L2','L3','L4','L5','L6'];
+let META = {L1:'초1',L2:'초2',L3:'초3~4',L4:'초5~6',L5:'상용1',L6:'상용2'};
+const lvLabel = L => `${L} (${META[L]||''})`;
 let BANK = {}, EX = {}, ETY = {}, ONKUN = {}, WORD = {};
 let vocab = load('vocab', {}), stats = load('quizStats', {});
 let tab = 'learn';
@@ -21,7 +23,8 @@ Promise.all([
   fetch('word_bank.json').then(r=>r.json()).catch(()=>({}))
 ]).then(([b,ex,ety,wb])=>{
   BANK=b; EX=ex; ETY=ety; WORD=wb||{};
-  for(const L in BANK) for(const x of BANK[L]) ONKUN[(x.k||'').normalize('NFC')]={on:x.on||[],kun:x.kun||[],e:x.e,d:x.d};
+  if(BANK._meta) META=BANK._meta;
+  for(const L of LV) for(const x of (BANK[L]||[])) ONKUN[(x.k||'').normalize('NFC')]={on:x.on||[],kun:x.kun||[],e:x.e,d:x.d};
   document.querySelectorAll('.tabbar button').forEach(btn=>btn.addEventListener('click',()=>{ tab=btn.dataset.tab; syncTabs(); render(); }));
   render();
 }).catch(e=>{ view.innerHTML='<div class="empty">데이터를 불러오지 못했습니다.<br>index.html·app.js·json 파일이 같은 폴더에 있고,<br>웹서버(https)로 열었는지 확인하세요.</div>'; });
@@ -59,7 +62,7 @@ function etyHtml(word){
 }
 
 /* ---------- 학습 (카드 한 장씩) ---------- */
-let learnLv = load('learnLv','N5'), learnIdx = 0, learnIdxW = 0;
+let learnLv = load('learnLv','L1'), learnIdx = 0, learnIdxW = 0;
 function renderLearn(){
   titleEl.textContent='학습';
   view.innerHTML = `<div class="seg" id="mode" style="margin-bottom:12px">
@@ -81,8 +84,9 @@ function renderLearnKanji(){
       <div class="seg" id="lv">${LV.map(L=>`<button data-v="${L}" class="${learnLv===L?'on':''}">${L}</button>`).join('')}</div>
       <div class="muted" style="font-size:13px">${learnIdx+1} / ${list.length}</div>
     </div>
+    <div class="muted" style="font-size:12px;margin:-4px 0 8px">${LV.map(L=>L+' '+(META[L]||'')).join(' · ')}</div>
     <div class="kcard">
-      <span class="lvl">${learnLv}</span>
+      <span class="lvl">${lvLabel(learnLv)}</span>
       <div class="han">${esc(x.k)}</div>
       <div class="eumhun">${esc(x.d)}</div>
       <div class="jp">${jpLine(x)}</div>
@@ -113,8 +117,9 @@ function renderLearnWord(){
       <div class="seg" id="wlv">${LV.map(L=>`<button data-v="${L}" class="${learnLv===L?'on':''}">${L}</button>`).join('')}</div>
       <div class="muted" style="font-size:13px">${learnIdxW+1} / ${list.length}</div>
     </div>
+    <div class="muted" style="font-size:12px;margin:-4px 0 8px">${LV.map(L=>L+' '+(META[L]||'')).join(' · ')}</div>
     <div class="kcard">
-      <span class="lvl">${learnLv} 숙어</span>
+      <span class="lvl">${lvLabel(learnLv)} 숙어</span>
       <div class="han" style="font-size:64px">${esc(x.w)}</div>
       <div class="jp" style="font-size:22px;color:var(--orange);text-align:center;margin-bottom:6px">${esc(x.r)}</div>
       <div class="eumhun">${esc(x.k)}</div>
@@ -211,7 +216,7 @@ function importCsv(ev){
 }
 
 /* ---------- 시험 ---------- */
-let quizCfg={src:'jlpt',level:'N5',cumulative:false,type:'mix',num:10};
+let quizCfg={src:'jlpt',level:'L1',cumulative:false,type:'mix',num:10};
 let Q=[], qi=0, sc=0, wrong=[], advancing=false;
 
 function poolItems(){
@@ -254,7 +259,7 @@ function quizSetup(){
       <button data-v="vocab" class="${quizCfg.src==='vocab'?'on':''}">내 단어장 (${vN})</button>
     </div>
     <div id="lvbox" style="${quizCfg.src==='jlpt'?'':'display:none'}">
-      <label>레벨 <span class="muted" style="font-weight:400">(${LV.map(L=>L+' '+(BANK[L]||[]).length).join(' · ')})</span></label>
+      <label>레벨 <span class="muted" style="font-weight:400">(${LV.map(L=>L+'('+(META[L]||'')+') '+(BANK[L]||[]).length).join(' · ')})</span></label>
       <div class="seg" id="qlv">${LV.map(L=>`<button data-v="${L}" class="${quizCfg.level===L?'on':''}">${L}</button>`).join('')}</div>
       <label style="font-weight:400;margin-top:10px"><input type="checkbox" id="cum" ${quizCfg.cumulative?'checked':''}> 이 레벨 이하 전체 포함</label>
     </div>
