@@ -263,12 +263,6 @@ function quizSetup(){
       <div class="seg" id="qlv">${LV.map(L=>`<button data-v="${L}" class="${quizCfg.level===L?'on':''}">${L}</button>`).join('')}</div>
       <label style="font-weight:400;margin-top:10px"><input type="checkbox" id="cum" ${quizCfg.cumulative?'checked':''}> 이 레벨 이하 전체 포함</label>
     </div>
-    <label>유형</label>
-    <div class="seg" id="qtype">
-      <button data-v="mix" class="${quizCfg.type==='mix'?'on':''}">섞기</button>
-      <button data-v="ko" class="${quizCfg.type==='ko'?'on':''}">한국음</button>
-      <button data-v="hun" class="${quizCfg.type==='hun'?'on':''}">훈음</button>
-    </div>
     <label>문제 수</label>
     <select id="num">${[10,20,30,50].map(n=>`<option value="${n}" ${quizCfg.num===n?'selected':''}>${n}문제</option>`).join('')}</select>
     <p style="margin-top:20px"><button class="btn" id="start" style="width:100%">시작하기</button></p>
@@ -276,7 +270,6 @@ function quizSetup(){
   const seg=(id,cb)=>$(id).querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>cb(b.dataset.v)));
   seg('src',v=>{quizCfg.src=v;quizSetup();});
   seg('qlv',v=>{quizCfg.level=v;quizSetup();});
-  seg('qtype',v=>{quizCfg.type=v;quizSetup();});
   const cum=$('cum'); if(cum)cum.addEventListener('change',e=>quizCfg.cumulative=e.target.checked);
   $('num').addEventListener('change',e=>quizCfg.num=parseInt(e.target.value,10));
   $('start').addEventListener('click',quizStart);
@@ -288,25 +281,31 @@ function quizStart(){
   qi=0; sc=0; wrong=[];
   const chosen=wpick(items,Math.min(quizCfg.num,items.length));
   Q=chosen.map(it=>{
-    const type=quizCfg.type==='mix'?(Math.random()<.5?'ko':'hun'):quizCfg.type;
-    const correct=answerOf(it,type); const tlen=hanCount(it.q);
-    let cand=uniqBy(items.filter(x=>x.key!==it.key),x=>answerOf(x,type)).filter(x=>answerOf(x,type)!==correct);
+    const dir=Math.random()<.5?'h2m':'m2h';
+    const tlen=hanCount(it.q);
+    let cand=uniqBy(items.filter(x=>x.key!==it.key),x=>x.hun).filter(x=>x.hun!==it.hun && x.q!==it.q);
     let same=shuffle(cand.filter(x=>hanCount(x.q)===tlen)), rest=shuffle(cand.filter(x=>hanCount(x.q)!==tlen));
-    let picked=same.concat(rest).slice(0,3).map(x=>({ans:answerOf(x,type),han:x.q,on:x.on,kun:x.kun,jpword:x.jpword}));
-    const opts=shuffle([{ans:correct,han:it.q,on:it.on,kun:it.kun,jpword:it.jpword},...picked]);
-    return { it, type, correct, options:opts };
+    let picked=same.concat(rest).slice(0,3);
+    const mk=x=> dir==='h2m'
+      ? {ans:x.hun,reveal:x.q,on:x.on,kun:x.kun,jpword:x.jpword}
+      : {ans:x.q,reveal:x.hun,on:x.on,kun:x.kun,jpword:x.jpword};
+    const correct=dir==='h2m'?it.hun:it.q;
+    const opts=shuffle([mk(it),...picked.map(mk)]);
+    return { it, dir, prompt:(dir==='h2m'?it.q:it.hun), correct, options:opts };
   });
   quizQuestion();
 }
 function quizQuestion(){
   advancing=false;
-  const q=Q[qi], label=q.type==='hun'?'훈음을 고르세요':'한국음을 고르세요';
+  const q=Q[qi], label=q.dir==='h2m'?'알맞은 훈음을 고르세요':'알맞은 한자를 고르세요';
+  const promptHtml=q.dir==='h2m'?`<div class="qhan">${esc(q.prompt)}</div>`:`<div class="qhun">${esc(q.prompt)}</div>`;
+  const optCls=q.dir==='m2h'?' opt-kanji':'';
   view.innerHTML=`
     <div class="topinfo"><span>${qi+1} / ${Q.length}</span><span>점수 ${sc}</span></div>
     <div class="bar"><div style="width:${(qi/Q.length)*100}%"></div></div>
     <div class="qtype">${label}</div>
-    <div class="qhan">${esc(q.it.q)}</div>
-    <div class="options">${q.options.map((o,i)=>`<button class="opt" data-i="${i}"><span class="opt-reading">${readingHtml(o)}</span><span class="opt-ans">${esc(o.ans)}</span><span class="opt-han">${esc(o.han)}</span></button>`).join('')}</div>
+    ${promptHtml}
+    <div class="options">${q.options.map((o,i)=>`<button class="opt" data-i="${i}"><span class="opt-reading">${readingHtml(o)}</span><span class="opt-ans${optCls}">${esc(o.ans)}</span><span class="opt-han">${esc(o.reveal)}</span></button>`).join('')}</div>
     <div class="verdict" id="verdict"></div>`;
   view.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>quizChoose(b,q)));
 }
@@ -320,12 +319,11 @@ function quizChoose(btn,q){
   });
   if(ok)sc++; else wrong.push(q);
   const s=stats[q.it.key]||{n:0,c:0}; s.n++; if(ok)s.c++; stats[q.it.key]=s; save('quizStats',stats);
-  const other=answerOf(q.it,q.type==='hun'?'ko':'hun');
   const last=qi===Q.length-1, inv=vocab[q.it.q];
   const v=$('verdict'); v.className='verdict '+(ok?'ok':'no');
   v.innerHTML=`
     <div class="vh">${ok?'⭕ 정답':'❌ 오답'}</div>
-    <div class="vb"><b>${esc(q.it.q)}</b> — ${esc(q.correct)} <span class="muted">(${esc(other)})</span></div>
+    <div class="vb"><b>${esc(q.it.q)}</b> — ${esc(q.it.hun)}</div>
     <div class="v-read">${readingHtml(q.it)}</div>
     <div class="v-legend"><b>.</b> 뒤 = 활용 어미(한자 소리는 점 앞) · <b>-</b> = 다른 글자가 붙음</div>
     ${(EX[q.it.q.normalize('NFC')]||[]).length?`<div class="v-ex"><div class="h">대표 숙어</div>${(EX[q.it.q.normalize('NFC')]||[]).map(e=>`<div class="ex-row"><span class="w">${esc(e.w)}</span><span class="r">${esc(e.r||'')}</span>${e.k?`<span class="k">${esc(e.k)}</span>`:''}<span class="m">${esc(e.m||'')}</span></div>`).join('')}</div>`:''}
@@ -346,7 +344,7 @@ function quizResult(){
     <div class="score">${sc} / ${Q.length}</div>
     <div class="center muted">이번 정답률 ${pct}%</div>
     ${mastery(poolItems())}
-    ${wrong.length?`<h4 style="margin-top:18px">오답 노트 (${wrong.length})</h4><div class="review">${wrong.map(q=>`<div class="r"><span class="h">${esc(q.it.q)}</span><span class="a">${esc(q.correct)}</span></div>`).join('')}</div>`:`<p class="center" style="color:#8ce99a;margin-top:16px">전부 정답입니다! 🎉</p>`}
+    ${wrong.length?`<h4 style="margin-top:18px">오답 노트 (${wrong.length})</h4><div class="review">${wrong.map(q=>`<div class="r"><span class="h">${esc(q.it.q)}</span><span class="a">${esc(q.it.hun)}</span></div>`).join('')}</div>`:`<p class="center" style="color:#8ce99a;margin-top:16px">전부 정답입니다! 🎉</p>`}
     <div class="center" style="margin-top:18px"><button class="btn" id="again">같은 범위 다시</button> <button class="btn ghost" id="home">설정으로</button></div>`;
   $('again').addEventListener('click',quizStart);
   $('home').addEventListener('click',quizSetup);
