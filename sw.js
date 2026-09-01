@@ -1,5 +1,5 @@
 // 오프라인 캐시 (홈화면 앱 실행 시 데이터까지 캐싱)
-const CACHE = 'hanja-v1';
+const CACHE = 'hanja-v2';
 const ASSETS = ['./','./index.html','./app.js','./manifest.webmanifest',
   './kanji_bank.json','./examples.json','./etymology.json','./word_bank.json',
   './icon-192.png','./icon-512.png','./apple-touch-icon.png'];
